@@ -1230,6 +1230,7 @@ def _extract_gateway_routing_metadata(agent, result, requested_model=None, reque
     ):
         if agent is not None:
             candidates.append(getattr(agent, attr, None))
+    found = None
     for candidate in candidates:
         normalized = _normalize_gateway_routing_metadata(
             candidate,
@@ -1237,8 +1238,21 @@ def _extract_gateway_routing_metadata(agent, result, requested_model=None, reque
             requested_provider=requested_provider,
         )
         if normalized:
-            return normalized
-    return None
+            found = normalized
+            break
+    # ADDITIVE: the LiteLLM (smart-)router's downstream pick for the turn —
+    # hermes-agent captures it from the x-litellm-downstream-model /
+    # x-litellm-model-api-base response headers into agent.last_routed_model.
+    # Surface it as routing metadata so the message footer can show e.g.
+    # "smart-router → MiniMax-M3" even when no provider failover occurred.
+    routed = _clean_gateway_routing_scalar(
+        getattr(agent, 'last_routed_model', None) if agent is not None else None
+    )
+    if routed:
+        if found is None:
+            found = {'provider_changed': False, 'model_changed': False, 'has_failover': False}
+        found.setdefault('downstream_model', routed)
+    return found
 
 
 def _build_agent_thread_env(profile_runtime_env: dict | None, workspace: str, session_id: str, profile_home: str) -> dict:
