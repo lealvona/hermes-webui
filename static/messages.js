@@ -2396,6 +2396,23 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
       _scheduleRender();
     });
 
+    // Smart-router: the backend the (smart-)router actually picked for this
+    // turn, captured streaming-safe by the gateway. Surface it in the status
+    // line (e.g. "smart-router → kimi") and stash it for any richer render.
+    source.addEventListener('routed_model',e=>{
+      try{
+        const d=JSON.parse(e.data);
+        const m=d&&d.model;
+        if(m){
+          window.__hermesRoutedModel=m;
+          const asked=(typeof _chatPayloadModel==='function'&&_chatPayloadModel())||'';
+          if(typeof setStatus==='function'){
+            setStatus(asked&&asked!==m?(asked+' → '+m):('routed: '+m));
+          }
+        }
+      }catch(_){ /* never break the stream on a display event */ }
+    });
+
     source.addEventListener('interim_assistant',e=>{
       if(_terminalStateReached||_streamFinalized) return;
       const d=JSON.parse(e.data);

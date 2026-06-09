@@ -375,6 +375,15 @@ def _run_gateway_chat_streaming(
                         update_active_run(stream_id, phase="gateway-tool", latest_tool=event_payload.get("name"))
                     sse_event = "message"
                     continue
+                if sse_event == "hermes.routed.model":
+                    # Smart-router: the actual backend the router picked for this
+                    # turn (e.g. asked smart-router -> ran kimi). Surfaced to the
+                    # browser so the UI can show it next to the message.
+                    _routed = (payload or {}).get("routed_model")
+                    if _routed:
+                        put_gateway_event("routed_model", {"model": _routed})
+                    sse_event = "message"
+                    continue
                 last_payload = payload
                 delta = _gateway_sse_delta(payload)
                 if delta:
