@@ -1429,6 +1429,10 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
   // settled the DOM — which was causing the thinking card to reappear below
   // the final answer or the response to render twice.
   let _streamFinalized=false;
+  // The litellm router's downstream pick for the current turn (from the
+  // hermes.routed.model SSE event). Stamped onto the final assistant message's
+  // _gatewayRouting at 'done' so the footer badge persists across re-renders.
+  let _routedDownstreamModel=null;
   let _pendingRafHandle=null;
   let _streamFadeVisibleText='';
   let _streamFadeLastTickMs=0;
@@ -2405,6 +2409,7 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
         const m=d&&d.model;
         if(m){
           window.__hermesRoutedModel=m;
+          _routedDownstreamModel=m;
           const asked=(typeof _chatPayloadModel==='function'&&_chatPayloadModel())||'';
           if(typeof setStatus==='function'){
             setStatus(asked&&asked!==m?(asked+' → '+m):('routed: '+m));
@@ -2829,6 +2834,14 @@ function attachLiveStream(activeSid, streamId, uploaded=[], options={}){
                 else if(S.session)S.session.gateway_routing_history=[d.usage.gateway_routing];
               }
             }
+          }
+          // Persist the litellm router's downstream pick (hermes.routed.model
+          // SSE) on the message footer via the existing _gatewayRouting
+          // ephemeral field — the status-line readout is wiped at stream end,
+          // so this badge is the durable surface.
+          if(_routedDownstreamModel&&lastAsst){
+            lastAsst._gatewayRouting={...(lastAsst._gatewayRouting||{}),downstream_model:_routedDownstreamModel};
+            _routedDownstreamModel=null;
           }
           const hasMessageToolMetadata=S.messages.some(m=>{
             if(!m||m.role!=='assistant') return false;
