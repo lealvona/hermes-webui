@@ -516,6 +516,25 @@ def main() -> None:
     # Fix sensitive file permissions before doing anything else
     fix_credential_permissions()
 
+    # Register hermes shell hooks (config.yaml `hooks:` block) for this
+    # process. Hermes registers them at CLI startup (hermes_cli/main.py)
+    # and gateway startup (gateway/run.py) — but the webui's IN-PROCESS
+    # agents (_run_agent_streaming) live in neither entrypoint, so policy
+    # hooks like pre_tool_call guards never fired for webui sessions.
+    # Registration is process-global; doing it once here covers every
+    # in-process agent. accept_hooks=False — consent comes from the
+    # profile's shell-hooks-allowlist.json (or hooks_auto_accept), same
+    # as the gateway. Best-effort: a hook problem must never block
+    # webui startup.
+    try:
+        from agent.shell_hooks import register_from_config
+        from hermes_cli.config import load_config as _hooks_load_config
+        _registered = register_from_config(_hooks_load_config(), accept_hooks=False)
+        if _registered:
+            print(f"[ok] Registered {len(_registered)} hermes shell hook(s) for in-process agents", flush=True)
+    except Exception as exc:
+        print(f"[!!] WARNING: shell-hook registration failed: {exc}", flush=True)
+
     # ── #1558 startup self-heal ─────────────────────────────────────────
     # If a previous process wrote a session JSON with fewer messages than
     # its .bak (the data-loss shape #1558 produced), restore from the .bak.
