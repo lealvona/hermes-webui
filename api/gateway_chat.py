@@ -423,6 +423,15 @@ def _run_gateway_chat_streaming(
                         put_gateway_event("reasoning", {"text": reason_delta})
                     sse_event = "message"
                     continue
+                if sse_event == "hermes.routed.model":
+                    # Smart-router: the actual backend the router picked for this
+                    # turn (e.g. asked smart-router -> ran kimi). Surfaced to the
+                    # browser so the UI can show it next to the message.
+                    _routed = (payload or {}).get("routed_model")
+                    if _routed:
+                        put_gateway_event("routed_model", {"model": _routed})
+                    sse_event = "message"
+                    continue
                 last_payload = payload
                 reasoning_delta = _gateway_sse_reasoning_delta(payload)
                 if reasoning_delta:

@@ -3784,7 +3784,14 @@ function _formatGatewayModelLabel(modelId,labelText,routing){
   const usedModel=String(routing.used_model||'').trim();
   const base=usedModel?getModelLabel(usedModel):(labelText||getModelLabel(modelId));
   const via=_gatewayRoutingLabel(routing);
-  return via?`${base} ${via}`:base;
+  let out=via?`${base} ${via}`:base;
+  // downstream_model: the backend the litellm (smart-)router actually picked
+  // for this turn (hermes.routed.model SSE) — append when it adds information.
+  const ds=String(routing.downstream_model||'').trim();
+  if(ds&&ds.toLowerCase()!==usedModel.toLowerCase()&&ds.toLowerCase()!==String(out||'').trim().toLowerCase()){
+    out=out?`${out} → ${getModelLabel(ds)}`:getModelLabel(ds);
+  }
+  return out;
 }
 function _gatewayRoutingFailoverText(routing){
   if(!routing||!routing.has_failover)return'';

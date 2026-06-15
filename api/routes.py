@@ -8321,6 +8321,35 @@ def handle_post(handler, parsed) -> bool:
         with _get_session_agent_lock(sid):
             s.personality = name if name else None
             s.save()
+        # Also update config.yaml so the gateway picks up the prompt at runtime.
+        # The TUI does this via _write_config_key("display.personality", pname)
+        # and _write_config_key("agent.system_prompt", new_prompt). The WebUI
+        # needs to do the same so the gateway's _ephemeral_system_prompt gets
+        # updated without requiring a restart.
+        try:
+            from api.config import (
+                _get_config_path,
+                get_config as _get_cfg,
+                reload_config as _reload_cfg,
+                _save_yaml_config_file,
+            )
+            _reload_cfg()
+            _cfg = _get_cfg()
+            # Write display.personality
+            _cfg.setdefault("display", {})
+            _cfg["display"]["personality"] = name if name else None
+            # Write agent.system_prompt (the actual prompt text)
+            _cfg.setdefault("agent", {})
+            _cfg["agent"]["system_prompt"] = prompt if prompt else ""
+            _save_yaml_config_file(_get_config_path(), _cfg)
+        except Exception as _write_err:
+            # Don't fail the personality switch if config write fails,
+            # but log it so the user knows.
+            import logging
+
+            logging.getLogger("hermes").warning(
+                "personality/set: failed to update config.yaml: %s", _write_err
+            )
         return j(handler, {"ok": True, "personality": s.personality, "prompt": prompt})
 
     if parsed.path == "/api/session/toolsets":
